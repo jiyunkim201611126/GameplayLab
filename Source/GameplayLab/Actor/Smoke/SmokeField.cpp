@@ -87,10 +87,34 @@ void ASmokeField::ApplySphereCut(const FVector& Center, const float Radius, cons
 void ASmokeField::ApplySegmentCut(const FVector& Start, const FVector& End, const float Radius, const float Strength,
 	const float ExpandDuration, const float HoldDuration, const float RecoveryDuration)
 {
+	const FVector Segment = End - Start;
+	const double SegmentLength = Segment.Length();
+	if (SegmentLength <= UE_SMALL_NUMBER)
+	{
+		return;
+	}
+	
+	const FVector Direction = Segment / SegmentLength;
+	const FVector StartToCenter = GetActorLocation() - Start;
+	
+	// Start End 방향으로 무한 직선을 가정하고, 그 직선 위 점 중 가장 연막 중심과 가까운 지점부터 Start까지의 거리
+	const double CenterDistance = FVector::DotProduct(StartToCenter, Direction);
+	
+	// 직선과 연막 중심 사이의 최단 거리 제곱(피타고라스)
+	const double ClosetDistanceSquared = StartToCenter.SizeSquared() - FMath::Square(CenterDistance);
+	
+	// 무한 직선 자체가 연막 구를 지나지 않음
+	if (ClosetDistanceSquared > FMath::Square(static_cast<double>(SmokeRadius)))
+	{
+		return;
+	}
+	
 	SegmentCut = FCutState();
 	
 	SegmentCut.Start = Start;
-	SegmentCut.End = End;
+	
+	// End 지점이 반드시 구 바깥까지 통과하도록 보장
+	SegmentCut.End = End + Direction * (SmokeRadius * 2.f + Radius);
 	
 	SegmentCut.Radius = FMath::Max(Radius, 0.0f);
 	SegmentCut.InitialStrength = FMath::Clamp(Strength, 0.0f, 1.0f);
